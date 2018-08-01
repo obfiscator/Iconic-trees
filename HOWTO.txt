@@ -1,0 +1,30 @@
+# Here are guidelines on how to run the scripts to download and analzye tree ring data.
+
+R version 2.12.1 (2010-12-16)
+
+Download the ESS (Emacs Speaks Statistics) code for emacs if you want to see nice colors in your .R files.
+http://ess.r-project.org/Manual/ess.html#Installation
+
+# For the moment, all functions are contained in a single file.
+
+source("/Users/mcgrath/NOENCRYPT/PROJECTS/DATA/TREE_RING/Iconic-trees/get_tree_data.R")
+
+##################
+# The first step is to download all the data.
+
+# First, the header file information, which gets searched to find out where the downloadable files are.
+this.content <- initialize.data()
+study.number.list <- this.content[["study"]][["xmlId"]]
+nstudies <- length(study.number.list)
+
+# Now actually connect to and download the data files themselves.  Notice that this will do it for all the studies...and there may be 5500 of them, so it will take half an hour.  
+get.data(1,nstudies,study.number.list)
+
+##################
+
+##################
+# The next step is to read in all the data files and combine them into one large data object, creating a new file with it (CSV).
+combine.data()
+
+
+##################
