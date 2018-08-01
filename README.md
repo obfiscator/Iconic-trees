@@ -1,2 +1,2 @@
 # Iconic-trees
-This is being done for the Data Incubator project.
+I am curious to play around with a tree ring database.
