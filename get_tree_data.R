@@ -1,29 +1,3 @@
-#source("/Users/mcgrath/NOENCRYPT/PROJECTS/DATA/DATA_INC/Iconic-trees/get_tree_data.R")
-#setwd("/Users/mcgrath/NOENCRYPT/PROJECTS/DATA/DATA_INC/Iconic-trees/")
-########################################################
-# These variables can be changed to match your system.
-
-# This is the directory that stores all the downloaded data
-data.dir <- "/Users/mcgrath/DATA/TREE_RING/"
-
-# What type of data are we looking for?
-data.file.type <- "crd"
-#data.file.type <- "rwl"
-
-
-########################################################
-# These libraries should not be changed.
-# Use some important libraries for accessing the API
-library(httr)
-library(jsonlite)
-library(dplR) # For tree rings
-########################################################
-
-
-# It appears that treating strings as factors is problematic.  This string helps.
-options(stringsAsFactors = FALSE)
-
-
 
 ##################################################################
 # Things below this line should not be changed unless debugging. #
@@ -151,9 +125,14 @@ combine.data <- function() {
   # For all these files, loop through them and read in the data they contain.
   nfiles <- length(file.list)
   file.numbers <- seq(1,nfiles)
+  
+  # Keep track of the files we skip due to formatting errors
+  skipped.file.name <- "skipped_files.txt"
+  file.create(skipped.file.name)
+
   ###
-  print("TRUNCATING FILES")
-  file.numbers <- seq(1,576)
+  #print("TRUNCATING FILES")
+  #file.numbers <- seq(1860,nfiles)
   ###
   
   #### This is to debug a specific file
@@ -164,8 +143,11 @@ combine.data <- function() {
     print(paste("Working on file: ",ifile,file.list[ifile]))
     
     # I have found some files do not conform to standards.  I put in workarounds where I can, but for these files there is no way to create a workaround that wouldn't break other functionality.
-    if(file.list[ifile] %in% c("ca556x.crn", "ca560x.crn", "newz103.crn", "newz107.crn", "newz110.crn", "newz111.crn", "newz113.crn")){
+    # This particular stretch of files is bad.
+    nonstand.files <- paste("cana0",seq(41,98),"x.crn",sep="")
+    if(file.list[ifile] %in% c("ca556x.crn", "ca560x.crn", "newz103.crn", "newz107.crn", "newz110.crn", "newz111.crn", "newz113.crn", "cana038x.crn", nonstand.files, "cypr006x.crn", "cypr007x.crn", "cypr008x.crn", "cypr009x.crn", "cypr010x.crn", "finl013x.crn", "nm588r.crn", "nm589r.crn", "russ244r.crn")){
       print("Skipping")
+      write(file.list[ifile],file=skipped.file.name,append=TRUE)
       next()
     }
     # For each file, I want to add the information inside to a table.
@@ -214,8 +196,8 @@ combine.data <- function() {
          # Copy the identity data over
          df.matrix[1,1] <- temp.df$siteID
          df.matrix[1,2] <- temp.df$speciesID
-         df.matrix[1,3] <- as.integer(temp.df$latitude)
-         df.matrix[1,4] <- as.integer(temp.df$longitude)
+         df.matrix[1,3] <- as.numeric(temp.df$latitude)
+         df.matrix[1,4] <- as.numeric(temp.df$longitude)
          
          # Now the growth data, just changing values for years which we actually have new data
          new.crn.year.index <- 0
@@ -247,8 +229,8 @@ combine.data <- function() {
          # Copy the identity data over
          df.matrix.new[irow.new,1] <- temp.df$siteID
          df.matrix.new[irow.new,2] <- temp.df$speciesID
-         df.matrix.new[irow.new,3] <- as.integer(temp.df$latitude)
-         df.matrix.new[irow.new,4] <- as.integer(temp.df$longitude)
+         df.matrix.new[irow.new,3] <- as.numeric(temp.df$latitude)
+         df.matrix.new[irow.new,4] <- as.numeric(temp.df$longitude)
          
          # Now the growth data, just changing values for years which we actually have new data
          new.crn.year.index <- 0
@@ -272,6 +254,9 @@ combine.data <- function() {
          rm(df.matrix.new)
        }
 
+     }else{
+       # Note that we're skipping this file
+       write(file.list[ifile],file=skipped.file.name,append=TRUE)
      }
       
     }else if(identical(data.file.type, "rwl")){
@@ -284,7 +269,7 @@ combine.data <- function() {
   }
   
   # Write all of this to a CSV file to be read in later
-  write.table(df.matrix, file = "combined_data.csv",sep = ",", col.names=TRUE, row.names = FALSE)
+  write.table(df.matrix, file = aggregate.data.file.name,sep = ",", col.names=TRUE, row.names = FALSE)
 }
 
 # This will open up a .crn file and return a list which includes a data.frame
@@ -297,10 +282,17 @@ read.crn.file <- function(file.name, encoding = getOption("encoding")) {
   # Determine if the header is there.  The header has information I want.
   hdr1 <- readLines(con, n = 1)
   # How long is this line?  If it's more than 200 characters, we probably have a formatting problem.
-  if(nchar(hdr1) > 200){
+  ncharacters <- nchar(hdr1,allowNA=TRUE)
+  if(is.na(ncharacters)){
+    print("The first line appears to be multibyte and I can't parse it.  Skipping.")
+    print(hdr1)
+    crn.list <- list(success=FALSE)
+    return(crn.list)
+  }
+  if(ncharacters > 200){
     print(paste("Really long header line in: ",file.name))
     browser()
-  }else if(nchar(hdr1) < 62){
+  }else if(ncharacters < 62){
     print(paste("Too short of header line in: ",file.name))
     browser()
   }
@@ -316,16 +308,57 @@ read.crn.file <- function(file.name, encoding = getOption("encoding")) {
   }
   
   # The latitude and longitude should be on line 2
-  # Note: lat-lons are in degrees and minutes, ddmm or dddmm.  There is a dash between them.
+  # Note: lat-lons are in degrees and minutes, ddmm or dddmm.  They begin with a -,+, or nothing.
   hdr2 <- readLines(con, n = 2)
   if (length(hdr2) < 2){
     print(paste("Why does this file have less than 2 lines? :",file.name))
     stop()
   }
   hdr2 <- hdr2[2]
-  latitude <- as.integer(substr(hdr2,48,51))
-  longitude <- as.integer(substr(hdr2,53,57))
-  
+  # The latitude and longitude headers are not very standardized.  Latitude is ddmm with a 0 or + to indicate NORTH, while longitude is dddmm with - to indicate WEST.  
+  # The standard, though, says the latitude and longitude go from 48 to 57.  That is 10 characters.  
+  # 45S, 145W would be -4500-14500...but that's 11 characters!  So the standard is bad.
+  # Try one thing, close to the standard
+  latitude <- as.numeric(substr(hdr2,47,51))
+  longitude <- as.numeric(substr(hdr2,52,57))
+  if(is.na(latitude) || is.na(longitude)){
+    # Try another thing
+    latitude <- as.numeric(substr(hdr2,48,52))
+    longitude <- as.numeric(substr(hdr2,53,58))
+    if(is.na(latitude) || is.na(longitude)){
+      print("Had a problem finding the latitude and longitude.")
+      print(hdr2)
+      crn.list <- list(success=FALSE)
+      return(crn.list)
+    }
+  }
+  # Convert latitude and longitude to decimal, from the ddmm format they are in.
+  # Notice that this works different for positive and negative numbers
+  latmin <- abs(latitude) %% 100 # latmin will always be positive this way
+  if(latmin >=60.0){
+    print("Our conversion to decimal latitude seems odd!")
+    print(latitude)
+    crn.list <- list(success=FALSE)
+    return(crn.list)
+  }
+  if(latitude > 0.0){
+    latitude <- (latitude - latmin) / 100.0 + latmin/60.0
+  }else{
+    latitude <- (latitude + latmin) / 100.0 - latmin/60.0
+  }
+  longmin <- abs(longitude) %% 100
+  if(longmin >=60.0){
+    print("Our conversion to decimal longitude seems odd!")
+    print(longitude)
+    crn.list <- list(success=FALSE)
+    return(crn.list)
+  }
+  if(longitude > 0.0){
+    longitude <- (longitude - longmin) / 100.0 + longmin/60.0
+  }else{
+    longitude <- (longitude + longmin) / 100.0 - longmin/60.0
+  }
+
   # Based on the years the records cover, we can create vectors to store the information
   first.year <- as.integer(substr(hdr2,68,71))
   last.year <- as.integer(substr(hdr2,73,76))

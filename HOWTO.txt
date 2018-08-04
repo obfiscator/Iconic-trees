@@ -5,9 +5,8 @@ R version 2.12.1 (2010-12-16)
 Download the ESS (Emacs Speaks Statistics) code for emacs if you want to see nice colors in your .R files.
 http://ess.r-project.org/Manual/ess.html#Installation
 
-# For the moment, all functions are contained in a single file.
-
-source("/Users/mcgrath/NOENCRYPT/PROJECTS/DATA/TREE_RING/Iconic-trees/get_tree_data.R")
+# Loading this file will load some others automatically
+source("/Users/mcgrath/NOENCRYPT/PROJECTS/DATA/TREE_RING/Iconic-trees/tree_library.R")
 
 ##################
 # The first step is to download all the data.
@@ -26,5 +25,16 @@ get.data(1,nstudies,study.number.list)
 # The next step is to read in all the data files and combine them into one large data object, creating a new file with it (CSV).
 combine.data()
 
+##################
 
 ##################
+# This command reads in the data file and creates a map showing the spatial distribution of all the studies.
+# The resolution of the grid is 0.5 degrees.
+create_spatial_distribution_graph()
+#################
+
+
+
+
+
+
